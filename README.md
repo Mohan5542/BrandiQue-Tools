@@ -24,7 +24,8 @@ app/tools/[slug]/           Reusable dedicated tool page
 components/shell.tsx         Navigation, search, directory and cards
 components/ui.tsx            Uploads, fields, errors, status, previews, downloads, ads
 components/tools/            Dedicated tool implementations
-components/tool-app.tsx      Code-split engine dispatcher
+components/tool-app.tsx      Server-selected tool UI (no runtime dispatcher import)
+components/tool-workspace.tsx Client initialization, error boundary and no-JS recovery
 lib/registry.ts              Tool descriptions, categories, formats, limits, related links
 lib/calculations.ts          Testable age, unit, EMI, CSV and image geometry logic
 lib/documents.ts             Lazy PDF/DOCX helpers
@@ -153,3 +154,18 @@ See `THIRD_PARTY.md` for dependency choices and FFmpeg's separate GPL obligation
 - The included `npm start` server streams files, negotiates gzip, supports ETags, revalidates HTML, and caches versioned assets. A third-party static host must enable equivalent compression/cache settings itself; `_headers` support varies by provider.
 
 To reproduce the cold-load check, build first, then run `node scripts/loading-audit.mjs`. Set `CHROMIUM_EXECUTABLE` if using a nonstandard Chromium location. The script simulates 1.6 Mbps download, 100 ms latency and 4× CPU slowdown in Chromium; it is a local lab check, not a guarantee for every device or hosting provider.
+
+
+## Diagnosing a workspace that will not open
+
+The tool UI is now selected by the server and delivered as part of its route. Only processing libraries remain on-demand. A CSS-based recovery notice appears after 12 seconds even when the application JavaScript never starts; it offers a full-page reload instead of depending on a broken client router. JavaScript-disabled browsers receive an explicit explanation. This does not make tools run without JavaScript or repair missing files on a remote host.
+
+Deploy the **entire** fresh `out/` directory atomically, including `_next/`, `vendor/` and `workers/`. Do not publish only HTML, apply a catch-all HTML rewrite to JavaScript/WASM requests, or cache HTML indefinitely. The supplied `_headers` requests HTML revalidation and immutable caching only for versioned Next assets; confirm your host actually honors it.
+
+After publishing, run:
+
+```sh
+npm run verify:deployment -- https://YOUR-ACTUAL-DOMAIN
+```
+
+The read-only checker verifies sitemap routes, unique page titles, script/style files, processing asset MIME types, missing files and accidental HTML rewrites. `npm run verify:deployment -- --local` checks the static export locally and runs in CI. A successful local check does not establish that a separately hosted copy is complete or current.

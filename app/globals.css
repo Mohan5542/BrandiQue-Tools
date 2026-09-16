@@ -1394,3 +1394,39 @@ fieldset.fields {
   display: grid;
   align-content: center;
 }
+
+.workspace-boot {
+  min-height: 180px;
+  padding: 16px 0;
+}
+.workspace-boot-recovery {
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+  animation: reveal-recovery 0s 12s forwards;
+}
+.workspace-boot-label {
+  animation: hide-boot-label 0s 12s forwards;
+}
+.workspace-recovery {
+  padding: 20px;
+  border: 1px solid #555;
+  border-radius: 12px;
+}
+.workspace-recovery p {
+  max-width: 65ch;
+}
+@keyframes reveal-recovery {
+  to {
+    visibility: visible;
+    height: auto;
+    overflow: visible;
+  }
+}
+@keyframes hide-boot-label {
+  to {
+    visibility: hidden;
+    height: 0;
+    margin: 0;
+  }
+}

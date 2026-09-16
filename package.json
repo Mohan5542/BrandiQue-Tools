@@ -12,7 +12,8 @@
     "test": "vitest run tests/unit.test.ts",
     "test:e2e": "playwright test",
     "prepare:assets": "node scripts/vendor.mjs",
-    "format": "prettier --write app components lib tests scripts *.ts *.mjs"
+    "format": "prettier --write app components lib tests scripts *.ts *.mjs",
+    "verify:deployment": "node scripts/verify-deployment.mjs"
   },
   "repository": {
     "type": "git",

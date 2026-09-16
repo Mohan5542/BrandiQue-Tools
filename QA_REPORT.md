@@ -9,7 +9,7 @@ Verified on 16 September 2026 against the production static export, using Chromi
 | ESLint | Passed |
 | Strict TypeScript | Passed |
 | Vitest | 20 tests passed |
-| Playwright | 22 integration tests passed |
+| Playwright | 25 integration tests passed |
 | Production build | Passed; static export generated |
 | Production dependency audit | No known vulnerabilities reported by npm audit --omit=dev at verification time |
 | Sitemap | 45 indexable routes: 39 tools plus home, directory and four trust pages |
@@ -82,3 +82,14 @@ Chromium lab simulation: fresh context for each tool, 1.6 Mbps download, 100 ms 
 | Resume Builder | 3.37 s | 1.70 s | 508,448 → 156,025 bytes |
 
 Repeat video conversions no longer reinitialize the engine. The initial approximately 32 MB FFmpeg download and actual media encoding are separate from workspace-opening measurements. Large files, unsupported codecs, browser memory and platform differences remain real limitations. No live deployment URL was supplied for this follow-up, so production hosting behavior has not been verified.
+
+
+## Stalled workspace follow-up
+
+The reported screenshot showed the shared startup placeholder, but no live URL was provided. This release removes the runtime `next/dynamic` tool dispatcher. The server selects the client tool UI as part of its route, with client initialization isolated from the server-rendered SEO content. Processing engines remain lazy-loaded. Missing bootstrap scripts now expose recovery using CSS alone after 12 seconds; JavaScript-disabled browsers receive an explicit explanation. This is failure detection/recovery, not a claim that absent or blocked JavaScript can run tools.
+
+Verified production build, lint, type checking, 20 unit tests and **25 browser tests**. Added regressions intentionally abort all application scripts, disable JavaScript entirely, and navigate through image/PDF/video/age/resume/JSON tools while checking console and page errors. Existing real uploads, conversion outputs, downloads and mobile layout tests passed unchanged.
+
+The deployment checker verified **45 routes, 12 initial script/style assets and 4 processing assets** with no missing assets, incorrect MIME types or catch-all HTML rewrites on the local server. The route audit checked 46 links with no broken links or page errors; homepage heavy-engine requests remained zero. The host header configuration now requests revalidation instead of indefinite HTML caching.
+
+Final cold-load sample under the same 1.6 Mbps / 100 ms / 4× CPU conditions: Image Resizer **1.56 s**, PDF Editor **1.52 s**, Video Resizer **1.52 s**, Resume Builder **1.57 s**. Each transferred approximately 174 KB of initial compressed JavaScript. The bundled tool UI trades a small byte increase for removal of the separate client-side import wait. These are local lab samples, not live-host or every-device guarantees. No live deployment URL was available; that remains necessary to diagnose the user's hosted copy and verify it has the new assets.
