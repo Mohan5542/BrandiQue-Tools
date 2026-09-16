@@ -1,6 +1,9 @@
 import http from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { createReadStream } from "node:fs";
+import { createGzip } from "node:zlib";
+import { pipeline } from "node:stream";
 const root = path.resolve("out");
 const types = {
   ".html": "text/html",
@@ -34,14 +37,48 @@ http
       }
       if ((await stat(target)).isDirectory())
         target = path.join(target, "index.html");
-      const data = await readFile(target);
-      res.writeHead(200, {
+      const info = await stat(target);
+      const etag = `"${info.size}-${info.mtimeMs.toString(16)}"`;
+      const mime = types[path.extname(target)] || "application/octet-stream";
+      const cache = url.pathname.startsWith("/_next/static/")
+        ? "public, max-age=31536000, immutable"
+        : url.pathname.startsWith("/vendor/")
+          ? "public, max-age=86400"
+          : "no-cache";
+      const responseHeaders = {
         ...headers,
-        "Content-Type":
-          types[path.extname(target)] || "application/octet-stream",
-        "Content-Length": data.length,
+        "Content-Type": mime,
+        "Cache-Control": cache,
+        ETag: etag,
+        Vary: "Accept-Encoding",
+      };
+      if (req.headers["if-none-match"] === etag) {
+        res.writeHead(304, responseHeaders);
+        res.end();
+        return;
+      }
+      const compressed =
+        /\bgzip\b/.test(req.headers["accept-encoding"] || "") &&
+        /text\/|application\/(javascript|json|xml|wasm)|image\/svg/.test(
+          mime,
+        ) &&
+        info.size > 1024;
+      res.writeHead(200, {
+        ...responseHeaders,
+        ...(compressed
+          ? { "Content-Encoding": "gzip" }
+          : { "Content-Length": info.size }),
       });
-      res.end(req.method === "HEAD" ? undefined : data);
+      if (req.method === "HEAD") {
+        res.end();
+        return;
+      }
+      const source = createReadStream(target);
+      const finish = () => {
+        if (!res.writableEnded) res.destroy();
+      };
+      if (compressed) pipeline(source, createGzip(), res, finish);
+      else pipeline(source, res, finish);
     } catch {
       res.writeHead(404, { "Content-Type": "text/html", ...headers });
       res.end(

@@ -79,6 +79,8 @@ test("image resize and compressor export decodable files without uploading", asy
     await page.goto("/tools/" + slug + "/");
     await expect(page.locator("[data-tool-ready=true]")).toBeVisible();
     await page.locator("input[type=file]").setInputFiles(fixture("png"));
+    if (slug === "image-compressor")
+      await page.getByLabel("Resize mode").selectOption("dimensions");
     await page.getByLabel("Width (px)", { exact: true }).fill("100");
     await page
       .getByRole("button", {

@@ -1383,3 +1383,14 @@ td a {
     z-index: 30;
   }
 }
+
+fieldset.fields {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.workspace-loading {
+  min-height: 180px;
+  display: grid;
+  align-content: center;
+}

@@ -124,3 +124,26 @@ describe("Video commands and registry", () => {
     }
   });
 });
+
+describe("File metadata compatibility", () => {
+  it("fills absent image MIME metadata without changing bytes", async () => {
+    const { normalizeFile } = await import("../lib/files");
+    const original = new File(
+      [new Uint8Array([137, 80, 78, 71])],
+      "camera.PNG",
+      { type: "application/octet-stream" },
+    );
+    const file = normalizeFile(original);
+    expect(file.type).toBe("image/png");
+    expect(new Uint8Array(await file.arrayBuffer())).toEqual(
+      new Uint8Array(await original.arrayBuffer()),
+    );
+  });
+  it("does not relabel arbitrary binary files as images", async () => {
+    const { normalizeFile } = await import("../lib/files");
+    const original = new File(["unknown"], "unknown.exe", {
+      type: "application/octet-stream",
+    });
+    expect(normalizeFile(original)).toBe(original);
+  });
+});

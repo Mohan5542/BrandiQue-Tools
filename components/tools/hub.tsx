@@ -68,7 +68,9 @@ export default function Hub() {
                   <td>{p[1]}</td>
                   <td>{p[2]}</td>
                   <td>
-                    <Link href={"/tools/" + p[3] + "/"}>Open converter →</Link>
+                    <Link prefetch={false} href={"/tools/" + p[3] + "/"}>
+                      Open converter →
+                    </Link>
                   </td>
                 </tr>
               ))}

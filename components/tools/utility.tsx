@@ -259,16 +259,18 @@ export default function Utility({ slug }: { slug: string }) {
           </pre>
           <div className="toolbar">
             <button
-              onClick={() =>
-                navigator.clipboard
-                  .writeText(output)
-                  .then(() => setError(""))
-                  .catch(() =>
-                    setError(
-                      "Clipboard access is unavailable. Select and copy the result manually.",
-                    ),
-                  )
-              }
+              onClick={async () => {
+                try {
+                  if (!navigator.clipboard)
+                    throw new Error("Clipboard unavailable");
+                  await navigator.clipboard.writeText(output);
+                  setError("");
+                } catch {
+                  setError(
+                    "Clipboard access is unavailable. Select and copy the result manually.",
+                  );
+                }
+              }}
             >
               Copy result
             </button>

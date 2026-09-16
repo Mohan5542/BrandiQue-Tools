@@ -142,3 +142,14 @@ Each tool reserves one non-overlapping, stable-height ad space after its workspa
 - Financial calculations are illustrative. Rates are entered by the user; no live tax or lending-rate claims are made.
 
 See `THIRD_PARTY.md` for dependency choices and FFmpeg's separate GPL obligations. Keep original files and verify exported results before relying on them.
+
+## Reliability and loading improvements
+
+- File selection uses a native keyboard-operable button and reports local read progress. Missing/generic MIME metadata from device pickers is normalized by extension; actual decoders still validate file contents. Invalid images in a batch no longer discard valid images.
+- Image processing falls back to Canvas when a Worker/OffscreenCanvas path is unavailable. Both paths support target-size attempts; unsupported encoders fail explicitly. The compressor preserves each image's dimensions by default. Original previews decode lazily.
+- PDF editing loads `pdf-lib` only after selection/export, retains parsed PDF preview documents within the workspace, and repaints annotations without reopening the PDF worker. Preview jobs are cancelled when changing pages; resources are released on reset/navigation.
+- Video conversions reuse the initialized FFmpeg worker within the current tool. Reset, cancel, or leaving the tool releases it. The first conversion still downloads the approximately 32 MB engine; video processing time depends on duration, resolution, codec and device performance.
+- Interactive tool controls mount only after browser initialization, avoiding duplicate server/client controls and lost early file selections. Tool descriptions, metadata, instructions and FAQs remain server-rendered. Tool cards prefetch on hover/keyboard focus; navigation provides loading feedback and slow-load recovery. Screenshot undo history has a memory budget, and clipboard denial shows an actionable message.
+- The included `npm start` server streams files, negotiates gzip, supports ETags, revalidates HTML, and caches versioned assets. A third-party static host must enable equivalent compression/cache settings itself; `_headers` support varies by provider.
+
+To reproduce the cold-load check, build first, then run `node scripts/loading-audit.mjs`. Set `CHROMIUM_EXECUTABLE` if using a nonstandard Chromium location. The script simulates 1.6 Mbps download, 100 ms latency and 4× CPU slowdown in Chromium; it is a local lab check, not a guarantee for every device or hosting provider.

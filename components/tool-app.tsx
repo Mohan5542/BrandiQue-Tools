@@ -1,27 +1,55 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
-const loading = () => <p role="status">Opening your workspace…</p>;
-const ImageTool = dynamic(() => import("./tools/image"), { loading });
-const VideoTool = dynamic(() => import("./tools/video"), { loading });
-const PdfTool = dynamic(() => import("./tools/pdf"), { loading });
-const DocumentTool = dynamic(() => import("./tools/document"), { loading });
-const ResumeTool = dynamic(() => import("./tools/resume"), { loading });
-const Screenshot = dynamic(() => import("./tools/screenshot"), { loading });
-const Utility = dynamic(() => import("./tools/utility"), { loading });
-const Hub = dynamic(() => import("./tools/hub"), { loading });
-const ImagePdf = dynamic(() => import("./tools/image-pdf"), { loading });
+function Loading() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 8000);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div className="workspace-loading" role="status" aria-live="polite">
+      <p>Opening your workspace…</p>
+      {slow && (
+        <>
+          <p>
+            Loading is taking longer than usual. Check your connection and
+            reload to retry.
+          </p>
+          <button onClick={() => window.location.reload()}>Reload tool</button>
+        </>
+      )}
+    </div>
+  );
+}
+const ImageTool = dynamic(() => import("./tools/image"), { loading: Loading });
+const VideoTool = dynamic(() => import("./tools/video"), { loading: Loading });
+const PdfTool = dynamic(() => import("./tools/pdf"), { loading: Loading });
+const DocumentTool = dynamic(() => import("./tools/document"), {
+  loading: Loading,
+});
+const ResumeTool = dynamic(() => import("./tools/resume"), {
+  loading: Loading,
+});
+const Screenshot = dynamic(() => import("./tools/screenshot"), {
+  loading: Loading,
+});
+const Utility = dynamic(() => import("./tools/utility"), { loading: Loading });
+const Hub = dynamic(() => import("./tools/hub"), { loading: Loading });
+const ImagePdf = dynamic(() => import("./tools/image-pdf"), {
+  loading: Loading,
+});
 const UnitTool = dynamic(
   () => import("./tools/calculators").then((m) => m.UnitTool),
-  { loading },
+  { loading: Loading },
 );
 const CalculatorTool = dynamic(
   () => import("./tools/calculators").then((m) => m.CalculatorTool),
-  { loading },
+  { loading: Loading },
 );
 const AgeTool = dynamic(
   () => import("./tools/calculators").then((m) => m.AgeTool),
-  { loading },
+  { loading: Loading },
 );
 function ToolContent({ engine, slug }: { engine: string; slug: string }) {
   switch (engine) {
@@ -59,7 +87,7 @@ export default function ToolApp(props: { engine: string; slug: string }) {
   useEffect(() => setReady(true), []);
   return (
     <div data-tool-ready={ready}>
-      <ToolContent {...props} />
+      {ready ? <ToolContent key={props.slug} {...props} /> : <Loading />}
     </div>
   );
 }

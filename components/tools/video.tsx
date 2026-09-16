@@ -27,6 +27,7 @@ export default function VideoTool({ slug }: { slug: string }) {
     [audio, setAudio] = useState(true),
     [audioBitrate, setAudioBitrate] = useState(128),
     [busy, setBusy] = useState(false),
+    [metadataBusy, setMetadataBusy] = useState(false),
     [status, setStatus] = useState(""),
     [progress, setProgress] = useState<number | undefined>(),
     [error, setError] = useState(""),
@@ -47,6 +48,9 @@ export default function VideoTool({ slug }: { slug: string }) {
   function choose(files: File[]) {
     const f = files[0];
     if (!f) return;
+    metadataCleanup.current?.();
+    setMetadataBusy(false);
+    setFile(null);
     setOutput(null);
     setError("");
     setStatus("");
@@ -63,8 +67,11 @@ export default function VideoTool({ slug }: { slug: string }) {
       return;
     }
     metadataCleanup.current?.();
-    setFile(null);
-    setStatus("Reading video metadata…");
+    setFile(f);
+    setMetadataBusy(true);
+    setStatus(
+      "Reading video metadata… Preview and controls will be ready shortly.",
+    );
     const url = URL.createObjectURL(f);
     const v = document.createElement("video");
     let settled = false;
@@ -84,6 +91,7 @@ export default function VideoTool({ slug }: { slug: string }) {
       const seconds = supported && Number.isFinite(v.duration) ? v.duration : 0;
       cleanup();
       metadataCleanup.current = null;
+      setMetadataBusy(false);
       setW(width);
       setH(height);
       setOriginal({ w: width, h: height });
@@ -123,21 +131,55 @@ export default function VideoTool({ slug }: { slug: string }) {
         throw new Error(
           "Check bitrate, frame rate (0–120), and audio bitrate (32–320 kbps).",
         );
+      videoArgs("input", "output", {
+        audioOnly,
+        format,
+        width: w,
+        height: h,
+        fit,
+        quality,
+        bitrate,
+        fps,
+        audio,
+        audioBitrate,
+      });
       setStatus("Loading the local video engine (about 32 MB on first use)…");
       const { FFmpeg } = await import("@ffmpeg/ffmpeg");
       if (cancelled.current) return;
-      const ff = new FFmpeg();
+      const ff = engine.current || new FFmpeg();
+      const fresh = !engine.current;
       engine.current = ff;
-      ff.on("progress", ({ progress: p }) => {
-        if (!cancelled.current) {
-          setProgress(Math.max(0, Math.min(99, Math.round(p * 100))));
-          setStatus("Processing on your device…");
+      if (fresh)
+        ff.on("progress", ({ progress: p }) => {
+          if (!cancelled.current) {
+            setProgress(Math.max(0, Math.min(99, Math.round(p * 100))));
+            setStatus("Processing on your device…");
+          }
+        });
+      if (!ff.loaded) {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            ff.load({
+              coreURL: "/vendor/ffmpeg-core.js",
+              wasmURL: "/vendor/ffmpeg-core.wasm",
+            }),
+            new Promise<never>((_, reject) => {
+              timeout = setTimeout(() => {
+                reject(
+                  new Error(
+                    "The video engine could not load. Check your connection and retry. The host must serve the /vendor/ engine files.",
+                  ),
+                );
+                ff.terminate();
+              }, 90000);
+            }),
+          ]);
+        } finally {
+          clearTimeout(timeout);
         }
-      });
-      await ff.load({
-        coreURL: "/vendor/ffmpeg-core.js",
-        wasmURL: "/vendor/ffmpeg-core.wasm",
-      });
+      }
+      setStatus("Preparing your video on this device…");
       if (cancelled.current) return;
       const input =
         "input." +
@@ -182,9 +224,22 @@ export default function VideoTool({ slug }: { slug: string }) {
         setStatus("Processing stopped.");
         setProgress(undefined);
       }
+      // Keep the initialized worker for the next conversion on this tool.
     } finally {
-      engine.current?.terminate();
-      engine.current = null;
+      if (engine.current && !engine.current.loaded) {
+        engine.current.terminate();
+        engine.current = null;
+      }
+      if (engine.current?.loaded) {
+        try {
+          const entries = await engine.current.listDir("/");
+          for (const entry of entries)
+            if (!entry.isDir && /^(input|output)\./.test(entry.name))
+              await engine.current.deleteFile(entry.name);
+        } catch {
+          /* Cancellation can terminate the worker during cleanup. */
+        }
+      }
       setBusy(false);
     }
   }
@@ -221,7 +276,7 @@ export default function VideoTool({ slug }: { slug: string }) {
             </div>
           </div>
           <BlobPreview blob={file} type="video" />
-          <div className="fields">
+          <fieldset className="fields" disabled={busy || metadataBusy}>
             <Field label="Output format">
               <select
                 value={format}
@@ -339,7 +394,7 @@ export default function VideoTool({ slug }: { slug: string }) {
                 ))}
               </select>
             </Field>
-          </div>
+          </fieldset>
           {!audioOnly && (
             <div className="toolbar">
               <label className="check">
@@ -395,13 +450,21 @@ export default function VideoTool({ slug }: { slug: string }) {
             </p>
           )}
           <div className="toolbar">
-            <button className="button" disabled={busy} onClick={run}>
+            <button
+              className="button"
+              disabled={busy || metadataBusy}
+              onClick={run}
+            >
               {audioOnly ? "Extract audio" : "Convert video"}
             </button>
             {busy && <button onClick={cancel}>Cancel processing</button>}
             <button
               disabled={busy}
               onClick={() => {
+                metadataCleanup.current?.();
+                setMetadataBusy(false);
+                engine.current?.terminate();
+                engine.current = null;
                 setFile(null);
                 setOutput(null);
                 setStatus("");

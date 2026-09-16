@@ -8,7 +8,7 @@ import {
   DownloadButton,
   Status,
 } from "@/components/ui";
-import { canvasBlob, message } from "@/lib/files";
+import { canvasBlob, message, decodeImage } from "@/lib/files";
 export default function ImagePdf() {
   const [files, setFiles] = useState<File[]>([]),
     [format, setFormat] = useState("a4"),
@@ -26,7 +26,7 @@ export default function ImagePdf() {
       const pdf = await PDFDocument.create();
       for (let i = 0; i < files.length; i++) {
         setStatus(`Adding image ${i + 1} of ${files.length}…`);
-        const bmp = await createImageBitmap(files[i]);
+        const bmp = await decodeImage(files[i]);
         if (bmp.width * bmp.height > 40000000) {
           bmp.close();
           throw new Error("Use images below 40 megapixels.");
@@ -34,7 +34,7 @@ export default function ImagePdf() {
         const c = document.createElement("canvas");
         c.width = bmp.width;
         c.height = bmp.height;
-        c.getContext("2d")!.drawImage(bmp, 0, 0);
+        c.getContext("2d")!.drawImage(bmp.source, 0, 0);
         bmp.close();
         const image = await pdf.embedPng(
           await (await canvasBlob(c)).arrayBuffer(),

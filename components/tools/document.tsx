@@ -37,6 +37,7 @@ export default function DocumentTool({ slug }: { slug: string }) {
     setOutput(null);
     setError("");
     try {
+      setStatus("Reading your document…");
       let text = "";
       if (pdf) {
         const doc = await loadPdf(await file.arrayBuffer());
@@ -115,6 +116,8 @@ export default function DocumentTool({ slug }: { slug: string }) {
         onFiles={(f) => {
           const x = f[0];
           setError("");
+          setFile(null);
+          setStatus("");
           setOutput(null);
           setPreview("");
           if (!x) return;

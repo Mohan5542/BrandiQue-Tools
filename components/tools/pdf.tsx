@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { degrees, PDFDocument, StandardFonts } from "pdf-lib";
+import type { PDFDocument } from "pdf-lib";
+import type { RenderTask } from "pdfjs-dist";
 import { loadPdf } from "@/lib/documents";
 import { canvasBlob, message, zipDownload } from "@/lib/files";
 import {
@@ -46,17 +47,35 @@ export default function PdfTool({ slug }: { slug: string }) {
     [error, setError] = useState(""),
     [status, setStatus] = useState(""),
     [busy, setBusy] = useState(false),
+    [rendering, setRendering] = useState(false),
     [asset, setAsset] = useState("");
   const canvas = useRef<HTMLCanvasElement>(null),
     base = useRef<HTMLCanvasElement | null>(null),
     start = useRef<{ x: number; y: number } | null>(null),
     stroke = useRef<{ x: number; y: number }[]>([]);
   const editor = slug === "pdf-editor";
+  const previewDocs = useRef(new Map<number, ReturnType<typeof loadPdf>>());
+  const baseKey = useRef("");
+  const previewReady = useRef(false);
+  function clearPreviews() {
+    previewReady.current = false;
+    baseKey.current = "";
+    for (const doc of previewDocs.current.values())
+      void doc.then((pdf) => pdf.destroy()).catch(() => {});
+    previewDocs.current.clear();
+    if (base.current) {
+      base.current.width = 0;
+      base.current = null;
+    }
+  }
+  useEffect(() => () => clearPreviews(), []);
   async function add(files: File[]) {
     setBusy(true);
     setError("");
     setOutput(null);
     try {
+      setStatus("Reading PDF pages…");
+      const { PDFDocument } = await import("pdf-lib");
       const news: Uint8Array[] = [],
         items: Page[] = [];
       for (const file of files) {
@@ -153,14 +172,28 @@ export default function PdfTool({ slug }: { slug: string }) {
   }
   useEffect(() => {
     let dead = false;
+    let task: RenderTask | undefined;
     const p = pages[selected];
-    if (!p) return;
+    if (!p) {
+      previewReady.current = false;
+      return;
+    }
     setOutput(null);
+    const key = `${p.source}:${p.index}:${p.rotation}`;
+    // Annotation edits reuse the existing page pixels instead of reparsing the PDF.
+    if (baseKey.current === key && base.current) {
+      previewReady.current = true;
+      setRendering(false);
+      paint(p.marks);
+      return;
+    }
+    previewReady.current = false;
+    setRendering(true);
     async function render() {
+      const b = document.createElement("canvas");
       try {
         const c = canvas.current;
         if (!c) return;
-        const b = document.createElement("canvas");
         if (p.source < 0) {
           b.width = 595;
           b.height = 842;
@@ -168,42 +201,57 @@ export default function PdfTool({ slug }: { slug: string }) {
           ctx.fillStyle = "white";
           ctx.fillRect(0, 0, b.width, b.height);
         } else {
-          const pdf = await loadPdf(sources[p.source].slice().buffer);
-          try {
-            const page = await pdf.getPage(p.index + 1);
-            const viewport = page.getViewport({
-              scale: 1,
-              rotation: (page.rotate + p.rotation) % 360,
+          if (!previewDocs.current.has(p.source)) {
+            const pending = loadPdf(sources[p.source].slice().buffer);
+            previewDocs.current.set(p.source, pending);
+            void pending.catch(() => {
+              if (previewDocs.current.get(p.source) === pending)
+                previewDocs.current.delete(p.source);
             });
-            b.width = viewport.width;
-            b.height = viewport.height;
-            await page.render({
-              canvas: b,
-              canvasContext: b.getContext("2d")!,
-              viewport,
-            }).promise;
-          } finally {
-            await pdf.destroy();
           }
+          const pdf = await previewDocs.current.get(p.source)!;
+          if (dead) return;
+          const page = await pdf.getPage(p.index + 1);
+          if (dead) return;
+          const normal = page.getViewport({ scale: 1 });
+          if (normal.width * normal.height > 20000000)
+            throw new Error("PDF page is too large to preview.");
+          const scale = 1;
+          const viewport = page.getViewport({
+            scale,
+            rotation: (page.rotate + p.rotation) % 360,
+          });
+          b.width = viewport.width;
+          b.height = viewport.height;
+          task = page.render({
+            canvas: b,
+            canvasContext: b.getContext("2d")!,
+            viewport,
+          });
+          await task.promise;
         }
-        if (dead) {
-          b.width = 0;
-          return;
-        }
+        if (dead) return;
+        if (base.current) base.current.width = 0;
         base.current = b;
+        baseKey.current = key;
         c.width = b.width;
         c.height = b.height;
+        previewReady.current = true;
         paint(p.marks);
       } catch {
         if (!dead) setError("Page preview failed. Try another PDF.");
+      } finally {
+        if (!dead) setRendering(false);
+        if (base.current !== b) b.width = 0;
       }
     }
-    render();
+    void render();
     return () => {
       dead = true;
+      task?.cancel();
     };
-    // Page state deliberately controls this imperative canvas renderer.
   }, [pages, selected, sources]);
+  useEffect(() => setOutput(null), [pages, numbering, quality, dpi]);
   function update(fn: (p: Page) => Page) {
     setOutput(null);
     setPages((prev) => prev.map((p, i) => (i === selected ? fn(p) : p)));
@@ -216,6 +264,7 @@ export default function PdfTool({ slug }: { slug: string }) {
     };
   }
   async function build(single?: Page[]) {
+    const { PDFDocument, StandardFonts, degrees } = await import("pdf-lib");
     const doc = await PDFDocument.create();
     const cache = new Map<number, PDFDocument>();
     const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -367,6 +416,7 @@ export default function PdfTool({ slug }: { slug: string }) {
         await zipDownload(outputs);
         setStatus("Split archive downloaded.");
       } else if (slug === "pdf-compressor") {
+        const { PDFDocument } = await import("pdf-lib");
         const input = await build();
         const pdf = await loadPdf(await input.arrayBuffer());
         const doc = await PDFDocument.create();
@@ -610,11 +660,13 @@ export default function PdfTool({ slug }: { slug: string }) {
               </div>
             )}
             <div className="canvas-wrap">
+              {rendering && <p aria-live="polite">Rendering page preview…</p>}
               <canvas
+                aria-busy={rendering}
                 ref={canvas}
                 aria-label="PDF page preview and annotation canvas"
                 onPointerDown={(e) => {
-                  if (!editor || busy) return;
+                  if (!editor || busy || !previewReady.current) return;
                   e.currentTarget.setPointerCapture(e.pointerId);
                   start.current = point(e);
                   stroke.current = [start.current];
@@ -726,6 +778,7 @@ export default function PdfTool({ slug }: { slug: string }) {
             <button
               disabled={busy}
               onClick={() => {
+                clearPreviews();
                 setPages([]);
                 setSources([]);
                 setSelected(0);

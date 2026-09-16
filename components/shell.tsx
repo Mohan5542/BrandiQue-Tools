@@ -23,8 +23,26 @@ export function ToolIcon({ tool }: { tool: Tool }) {
   return <Icon size={22} />;
 }
 export function ToolCard({ tool }: { tool: Tool }) {
+  const [intent, setIntent] = useState(false);
+  const [opening, setOpening] = useState(false);
   return (
-    <Link prefetch={false} className="tool-card" href={`/tools/${tool.slug}/`}>
+    <Link
+      prefetch={intent ? null : false}
+      onMouseEnter={() => setIntent(true)}
+      onFocus={() => setIntent(true)}
+      onClick={(event) => {
+        if (
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.shiftKey &&
+          event.button === 0
+        )
+          setOpening(true);
+      }}
+      aria-busy={opening}
+      className="tool-card"
+      href={`/tools/${tool.slug}/`}
+    >
       <div className="card-top">
         <span className="tool-icon">
           <ToolIcon tool={tool} />
@@ -36,7 +54,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
       <div className="card-foot">
         <span>{tool.category}</span>
         <span>
-          Open tool <ArrowRight size={13} />
+          {opening ? "Opening…" : "Open tool"} <ArrowRight size={13} />
         </span>
       </div>
     </Link>

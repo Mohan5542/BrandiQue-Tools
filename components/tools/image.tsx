@@ -10,6 +10,7 @@ import {
 } from "@/components/ui";
 import {
   bytes,
+  decodeImage,
   releaseCanvas,
   canvasBlob,
   message,
@@ -31,7 +32,9 @@ export default function ImageTool({ slug }: { slug: string }) {
     [h, setH] = useState(800),
     [lock, setLock] = useState(true),
     [percent, setPercent] = useState(100),
-    [mode, setMode] = useState("dimensions"),
+    [mode, setMode] = useState(
+      slug === "image-compressor" ? "percent" : "dimensions",
+    ),
     [fit, setFit] = useState("contain"),
     [type, setType] = useState("image/webp"),
     [quality, setQuality] = useState(0.82),
@@ -41,48 +44,59 @@ export default function ImageTool({ slug }: { slug: string }) {
     [error, setError] = useState("");
   const worker = useRef<Worker | null>(null);
   const cancelled = useRef(false);
+  const stopWorker = useRef<(() => void) | null>(null);
   const compress = slug === "image-compressor";
   useEffect(
     () => () => {
       cancelled.current = true;
+      stopWorker.current?.();
       worker.current?.terminate();
     },
     [],
   );
   async function add(incoming: File[]) {
+    cancelled.current = false;
     setError("");
-    try {
-      const entries: Entry[] = [];
-      for (const file of incoming) {
+    setBusy(true);
+    const entries: Entry[] = [];
+    const failures: string[] = [];
+    for (const [index, file] of incoming.entries()) {
+      if (cancelled.current) break;
+      setStatus(`Reading image ${index + 1} of ${incoming.length}…`);
+      try {
         if (!/^image\/(jpeg|png|webp|avif)$/.test(file.type))
-          throw new Error(
-            "Choose JPG, PNG, WebP or AVIF images. SVG and animated formats are not accepted here.",
-          );
-        const bmp = await createImageBitmap(file, {
-          imageOrientation: "from-image",
-        });
-        if (bmp.width * bmp.height > 60000000) {
+          throw new Error("Choose JPG, PNG, WebP or AVIF images.");
+        const bmp = await decodeImage(file);
+        try {
+          if (bmp.width * bmp.height > 60000000)
+            throw new Error(
+              "This image exceeds 60 megapixels. Use a smaller source.",
+            );
+          entries.push({
+            id: Math.random(),
+            file,
+            width: bmp.width,
+            height: bmp.height,
+          });
+        } finally {
           bmp.close();
-          throw new Error(
-            "This image exceeds 60 megapixels. Use a smaller source to avoid exhausting browser memory.",
-          );
         }
-        entries.push({
-          id: Math.random(),
-          file,
-          width: bmp.width,
-          height: bmp.height,
-        });
-        bmp.close();
+      } catch (e) {
+        failures.push(`${file.name}: ${message(e)}`);
       }
-      setFiles((prev) => [...prev, ...entries]);
-      if (!files.length && entries.length) {
-        setW(entries[0].width);
-        setH(entries[0].height);
-      }
-    } catch (e) {
-      setError(message(e));
     }
+    setFiles((prev) => [...prev, ...entries]);
+    if (!files.length && entries.length) {
+      setW(entries[0].width);
+      setH(entries[0].height);
+    }
+    setError(failures.join(" "));
+    setStatus(
+      entries.length
+        ? `Ready: ${entries.length} image${entries.length === 1 ? "" : "s"} added.`
+        : "",
+    );
+    setBusy(false);
   }
   async function process() {
     setBusy(true);
@@ -117,54 +131,99 @@ export default function ImageTool({ slug }: { slug: string }) {
           );
         if (percent <= 0 || percent > 1000)
           throw new Error("Scale must be between 1 and 1000%.");
-        let blob: Blob;
-        if (typeof OffscreenCanvas !== "undefined") {
-          blob = await new Promise<Blob>((resolve, reject) => {
-            const wr = new Worker("/workers/image.js");
-            worker.current = wr;
-            wr.onmessage = (e) => {
-              wr.terminate();
-              worker.current = null;
-              if (e.data.error) {
-                reject(new Error(e.data.error));
-              } else {
-                resolve(e.data.blob);
-              }
-            };
-            wr.onerror = () => {
-              wr.terminate();
-              reject(new Error("The image worker failed. Try a smaller file."));
-            };
-            wr.postMessage({
-              file: f.file,
-              width,
-              height,
-              fit,
-              type,
-              quality,
-              target: target * 1024,
-            });
-          });
-        } else {
-          const bmp = await createImageBitmap(f.file);
+        async function fallback() {
+          const bmp = await decodeImage(f.file);
           const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d")!;
-          if (type === "image/jpeg") {
-            ctx.fillStyle = "#fff";
-            ctx.fillRect(0, 0, width, height);
+          try {
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx)
+              throw new Error(
+                "Canvas processing is not available in this browser.",
+              );
+            if (type === "image/jpeg") {
+              ctx.fillStyle = "#fff";
+              ctx.fillRect(0, 0, width, height);
+            }
+            const g = imageGeometry(bmp.width, bmp.height, width, height, fit);
+            ctx.drawImage(bmp.source, g.x, g.y, g.w, g.h);
+            let result = await canvasBlob(canvas, type, quality);
+            if (
+              type !== "image/png" &&
+              target > 0 &&
+              result.size > target * 1024
+            ) {
+              let lo = 0.05,
+                hi = quality;
+              for (
+                let attempt = 0;
+                attempt < 7 && !cancelled.current;
+                attempt++
+              ) {
+                const q = (lo + hi) / 2;
+                const candidate = await canvasBlob(canvas, type, q);
+                if (candidate.size <= target * 1024) {
+                  result = candidate;
+                  lo = q;
+                } else {
+                  hi = q;
+                  if (candidate.size < result.size) result = candidate;
+                }
+              }
+            }
+            if (result.type !== type)
+              throw new Error(
+                "Selected output format is not supported by this browser.",
+              );
+            return result;
+          } finally {
+            bmp.close();
+            releaseCanvas(canvas);
           }
-          const g = imageGeometry(bmp.width, bmp.height, width, height, fit);
-          ctx.drawImage(bmp, g.x, g.y, g.w, g.h);
-          bmp.close();
-          blob = await canvasBlob(canvas, type, quality);
-          releaseCanvas(canvas);
-          if (blob.type !== type)
-            throw new Error(
-              "Selected output format is not supported by this browser.",
-            );
         }
+        let blob: Blob;
+        if (
+          typeof OffscreenCanvas !== "undefined" &&
+          typeof Worker !== "undefined"
+        ) {
+          try {
+            blob = await new Promise<Blob>((resolve, reject) => {
+              const wr = new Worker("/workers/image.js");
+              worker.current = wr;
+              const done = (error?: string, output?: Blob) => {
+                clearTimeout(timer);
+                wr.terminate();
+                worker.current = null;
+                stopWorker.current = null;
+                if (error) reject(new Error(error));
+                else resolve(output!);
+              };
+              const timer = setTimeout(
+                () => done("Image worker timed out."),
+                30000,
+              );
+              stopWorker.current = () => done("Cancelled.");
+              wr.onmessage = (e) => done(e.data.error, e.data.blob);
+              wr.onerror = () => done("Image worker unavailable.");
+              wr.postMessage({
+                file: f.file,
+                width,
+                height,
+                fit,
+                type,
+                quality,
+                target: target * 1024,
+              });
+            });
+          } catch (e) {
+            if (cancelled.current) throw e;
+            setStatus(
+              `Processing image ${i + 1} using browser compatibility mode…`,
+            );
+            blob = await fallback();
+          }
+        } else blob = await fallback();
         if (!cancelled.current)
           setFiles((prev) =>
             prev.map((x) =>
@@ -176,7 +235,7 @@ export default function ImageTool({ slug }: { slug: string }) {
         setStatus("Processing complete. Compare your outputs below.");
     } catch (e) {
       if (!cancelled.current) setError(message(e));
-      setStatus("");
+      if (!cancelled.current) setStatus("");
     } finally {
       setBusy(false);
     }
@@ -315,6 +374,17 @@ export default function ImageTool({ slug }: { slug: string }) {
             <button className="button" disabled={busy} onClick={process}>
               {compress ? "Compress images" : "Resize images"}
             </button>
+            {busy && (
+              <button
+                onClick={() => {
+                  cancelled.current = true;
+                  stopWorker.current?.();
+                  setStatus("Cancelled. Completed images remain available.");
+                }}
+              >
+                Cancel processing
+              </button>
+            )}
             <button
               disabled={busy}
               onClick={() => {

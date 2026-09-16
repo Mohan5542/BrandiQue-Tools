@@ -6,7 +6,7 @@ import {
   ErrorAlert,
   DownloadButton,
 } from "@/components/ui";
-import { canvasBlob, message } from "@/lib/files";
+import { canvasBlob, message, decodeImage } from "@/lib/files";
 export default function Screenshot() {
   const canvas = useRef<HTMLCanvasElement>(null),
     start = useRef<{ x: number; y: number } | null>(null),
@@ -35,7 +35,11 @@ export default function Screenshot() {
     history.current.push(
       c.getContext("2d")!.getImageData(0, 0, c.width, c.height),
     );
-    if (history.current.length > 8) history.current.shift();
+    const limit = Math.max(
+      1,
+      Math.min(8, Math.floor((48 * 1024 * 1024) / (c.width * c.height * 4))),
+    );
+    while (history.current.length > limit) history.current.shift();
     setOutput(null);
   }
   async function load(files: File[]) {
@@ -45,7 +49,7 @@ export default function Screenshot() {
       if (!f) return;
       if (!/^image\/(png|jpeg|webp)$/.test(f.type))
         throw new Error("Choose a PNG, JPG or WebP screenshot.");
-      const bmp = await createImageBitmap(f);
+      const bmp = await decodeImage(f);
       if (bmp.width * bmp.height > 24000000) {
         bmp.close();
         throw new Error("Use an image below 24 megapixels.");
@@ -53,7 +57,7 @@ export default function Screenshot() {
       const c = canvas.current!;
       c.width = bmp.width;
       c.height = bmp.height;
-      c.getContext("2d")!.drawImage(bmp, 0, 0);
+      c.getContext("2d")!.drawImage(bmp.source, 0, 0);
       setWidth(bmp.width);
       setHeight(bmp.height);
       bmp.close();

@@ -6,7 +6,9 @@ export function download(blob: Blob, name: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = safeName(name);
+  document.body.appendChild(a);
   a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 export function bytes(n: number) {
@@ -48,4 +50,94 @@ export async function canvasBlob(
 export function releaseCanvas(canvas: HTMLCanvasElement) {
   canvas.width = 0;
   canvas.height = 0;
+}
+
+/** Metadata fallback only; never substitutes for decoding/validating file contents. */
+export function normalizeFile(file: File): File {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const mime: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    avif: "image/avif",
+    pdf: "application/pdf",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    webm: "video/webm",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+  };
+  if (
+    (!file.type ||
+      file.type === "application/octet-stream" ||
+      file.type === "image/jpg") &&
+    mime[ext]
+  )
+    return new File([file], file.name, {
+      type: mime[ext],
+      lastModified: file.lastModified,
+    });
+  return file;
+}
+
+export async function decodeImage(
+  file: Blob,
+): Promise<{
+  width: number;
+  height: number;
+  source: CanvasImageSource;
+  close: () => void;
+}> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file, {
+        imageOrientation: "from-image",
+      });
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        source: bitmap,
+        close: () => bitmap.close(),
+      };
+    } catch {
+      /* Some browsers decode more formats through an image element. */
+    }
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        img.src = "";
+        reject(new Error("Image decoding timed out. Try a smaller image."));
+      }, 15000);
+      img.onload = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      img.onerror = () => {
+        clearTimeout(timer);
+        reject(
+          new Error(
+            "This image cannot be decoded. It may be damaged or unsupported by this browser.",
+          ),
+        );
+      };
+      img.src = url;
+    });
+    return {
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+      source: img,
+      close: () => {
+        img.src = "";
+        URL.revokeObjectURL(url);
+      },
+    };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
 }
