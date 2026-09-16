@@ -1,0 +1,57 @@
+{
+  "name": "brandique-tools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node scripts/vendor.mjs && next dev --hostname 0.0.0.0",
+    "build": "node scripts/vendor.mjs && next build",
+    "start": "node scripts/serve.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run tests/unit.test.ts",
+    "test:e2e": "playwright test",
+    "prepare:assets": "node scripts/vendor.mjs",
+    "format": "prettier --write app components lib tests scripts *.ts *.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mohan5542/BrandiQue-Tools.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Mohan5542/BrandiQue-Tools/issues"
+  },
+  "homepage": "https://github.com/Mohan5542/BrandiQue-Tools#readme",
+  "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "docx": "^9.7.1",
+    "jszip": "^3.10.2",
+    "lucide-react": "^1.46.0",
+    "next": "^16.3.5",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@sparticuz/chromium": "^153.0.0",
+    "@types/node": "^25.9.7",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.5",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.1"
+  },
+  "private": true
+}
