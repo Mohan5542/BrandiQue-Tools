@@ -185,3 +185,29 @@ test("real file picker works across all shared file workspaces", async ({
     await expect(page.locator(`.app-card ${marker}`).first()).toBeVisible();
   }
 });
+
+test("image resizer accepts pasted image bytes and exports a real file", async ({
+  page,
+}) => {
+  await page.goto("/tools/image-resizer/");
+  await expect(
+    page.getByRole("button", { name: "Choose files", exact: true }),
+  ).toBeEnabled();
+  const bytes = Array.from(await readFile("tests/fixtures/sample.png"));
+  await page.evaluate((bytes) => {
+    const clipboard = new DataTransfer();
+    clipboard.items.add(
+      new File([new Uint8Array(bytes)], "pasted.png", { type: "image/png" }),
+    );
+    window.dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData: clipboard }),
+    );
+  }, bytes);
+  await expect(page.getByLabel("Width (px)", { exact: true })).toHaveValue(
+    "200",
+  );
+  await page
+    .getByRole("button", { name: "Resize images", exact: true })
+    .click();
+  await expect(page.getByRole("button", { name: /Download ·/ })).toBeVisible();
+});

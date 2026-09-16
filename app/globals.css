@@ -1395,18 +1395,17 @@ fieldset.fields {
   align-content: center;
 }
 
-.workspace-boot {
-  min-height: 180px;
-  padding: 16px 0;
+.tool-controls {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
 }
-.workspace-boot-recovery {
+.workspace-connection-help {
   visibility: hidden;
   height: 0;
   overflow: hidden;
-  animation: reveal-recovery 0s 12s forwards;
-}
-.workspace-boot-label {
-  animation: hide-boot-label 0s 12s forwards;
+  animation: reveal-connection-help 0s 12s forwards;
 }
 .workspace-recovery {
   padding: 20px;
@@ -1416,17 +1415,10 @@ fieldset.fields {
 .workspace-recovery p {
   max-width: 65ch;
 }
-@keyframes reveal-recovery {
+@keyframes reveal-connection-help {
   to {
     visibility: visible;
     height: auto;
     overflow: visible;
-  }
-}
-@keyframes hide-boot-label {
-  to {
-    visibility: hidden;
-    height: 0;
-    margin: 0;
   }
 }

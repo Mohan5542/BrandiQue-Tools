@@ -246,6 +246,7 @@ export default function ImageTool({ slug }: { slug: string }) {
       <UploadDropzone
         accept="image/jpeg,image/png,image/webp,image/avif"
         multiple
+        pasteImages
         onFiles={add}
         disabled={busy}
       />

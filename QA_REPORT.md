@@ -9,7 +9,7 @@ Verified on 16 September 2026 against the production static export, using Chromi
 | ESLint | Passed |
 | Strict TypeScript | Passed |
 | Vitest | 20 tests passed |
-| Playwright | 25 integration tests passed |
+| Playwright | 27 distinct browser checks verified |
 | Production build | Passed; static export generated |
 | Production dependency audit | No known vulnerabilities reported by npm audit --omit=dev at verification time |
 | Sitemap | 45 indexable routes: 39 tools plus home, directory and four trust pages |
@@ -93,3 +93,16 @@ Verified production build, lint, type checking, 20 unit tests and **25 browser t
 The deployment checker verified **45 routes, 12 initial script/style assets and 4 processing assets** with no missing assets, incorrect MIME types or catch-all HTML rewrites on the local server. The route audit checked 46 links with no broken links or page errors; homepage heavy-engine requests remained zero. The host header configuration now requests revalidation instead of indefinite HTML caching.
 
 Final cold-load sample under the same 1.6 Mbps / 100 ms / 4× CPU conditions: Image Resizer **1.56 s**, PDF Editor **1.52 s**, Video Resizer **1.52 s**, Resume Builder **1.57 s**. Each transferred approximately 174 KB of initial compressed JavaScript. The bundled tool UI trades a small byte increase for removal of the separate client-side import wait. These are local lab samples, not live-host or every-device guarantees. No live deployment URL was available; that remains necessary to diagnose the user's hosted copy and verify it has the new assets.
+
+
+## Direct controls in the initial page
+
+Removed the client-readiness conditional that replaced the complete tool UI with startup text. All 39 tool workspaces now render their actual controls in the initial HTML. Native fieldset disabling prevents edits from being lost before hydration; it does not hide the workspace. Connection help for blocked scripts is secondary to the visible controls. Real processing errors still receive honest error messages.
+
+Added image paste support to Image Resizer and Image Compressor, using the same local validation, decoding and output pipeline as ordinary selection. Added a pasted-image regression and a JavaScript-disabled test of the actual controls on all 39 tool routes.
+
+Build, lint, strict types, 20 unit tests and local deployment asset validation passed. All 27 distinct browser checks were verified: the full run passed 26; one test incorrectly applied Playwright's disabled assertion to the fieldset itself. After correcting the test to inspect the disabled attribute and actual file-picker button, all four startup tests passed. No application code was changed to mask that assertion failure. The existing real image/video/PDF/document/resume output checks, navigation console checks, responsive layouts and accessibility checks passed.
+
+Final cold-load interaction readiness under the documented slow-network lab conditions: Image Resizer 1.60 s, PDF Editor 1.56 s, Video Resizer 1.59 s, Resume Builder 1.56 s. Controls are visible before these interaction-ready times because they are in the HTML. Browser tooling still needs JavaScript, and video encoding is not instantaneous. Final route audit: 45 sitemap routes, 46 links checked, no broken links/page errors, no external homepage requests or heavy-engine requests.
+
+The user did not provide a live URL or running method when asked. The hosted failure therefore remains unverified; source changes and local tests cannot prove that a separately deployed copy is complete or current.

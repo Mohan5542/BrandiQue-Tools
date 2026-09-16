@@ -25,7 +25,7 @@ components/shell.tsx         Navigation, search, directory and cards
 components/ui.tsx            Uploads, fields, errors, status, previews, downloads, ads
 components/tools/            Dedicated tool implementations
 components/tool-app.tsx      Server-selected tool UI (no runtime dispatcher import)
-components/tool-workspace.tsx Client initialization, error boundary and no-JS recovery
+components/tool-workspace.tsx Server-rendered controls, hydration guard and error boundary
 lib/registry.ts              Tool descriptions, categories, formats, limits, related links
 lib/calculations.ts          Testable age, unit, EMI, CSV and image geometry logic
 lib/documents.ts             Lazy PDF/DOCX helpers
@@ -150,7 +150,7 @@ See `THIRD_PARTY.md` for dependency choices and FFmpeg's separate GPL obligation
 - Image processing falls back to Canvas when a Worker/OffscreenCanvas path is unavailable. Both paths support target-size attempts; unsupported encoders fail explicitly. The compressor preserves each image's dimensions by default. Original previews decode lazily.
 - PDF editing loads `pdf-lib` only after selection/export, retains parsed PDF preview documents within the workspace, and repaints annotations without reopening the PDF worker. Preview jobs are cancelled when changing pages; resources are released on reset/navigation.
 - Video conversions reuse the initialized FFmpeg worker within the current tool. Reset, cancel, or leaving the tool releases it. The first conversion still downloads the approximately 32 MB engine; video processing time depends on duration, resolution, codec and device performance.
-- Interactive tool controls mount only after browser initialization, avoiding duplicate server/client controls and lost early file selections. Tool descriptions, metadata, instructions and FAQs remain server-rendered. Tool cards prefetch on hover/keyboard focus; navigation provides loading feedback and slow-load recovery. Screenshot undo history has a memory budget, and clipboard denial shows an actionable message.
+- Interactive tool controls are included in the initial HTML and remain visible before JavaScript runs. A fieldset prevents premature interaction until hydration completes; there is no full-workspace startup placeholder. Tool descriptions, metadata, instructions and FAQs are also server-rendered. Tool cards prefetch on hover/keyboard focus; navigation provides loading feedback and slow-load recovery. Screenshot undo history has a memory budget, and clipboard denial shows an actionable message.
 - The included `npm start` server streams files, negotiates gzip, supports ETags, revalidates HTML, and caches versioned assets. A third-party static host must enable equivalent compression/cache settings itself; `_headers` support varies by provider.
 
 To reproduce the cold-load check, build first, then run `node scripts/loading-audit.mjs`. Set `CHROMIUM_EXECUTABLE` if using a nonstandard Chromium location. The script simulates 1.6 Mbps download, 100 ms latency and 4× CPU slowdown in Chromium; it is a local lab check, not a guarantee for every device or hosting provider.
@@ -158,7 +158,7 @@ To reproduce the cold-load check, build first, then run `node scripts/loading-au
 
 ## Diagnosing a workspace that will not open
 
-The tool UI is now selected by the server and delivered as part of its route. Only processing libraries remain on-demand. A CSS-based recovery notice appears after 12 seconds even when the application JavaScript never starts; it offers a full-page reload instead of depending on a broken client router. JavaScript-disabled browsers receive an explicit explanation. This does not make tools run without JavaScript or repair missing files on a remote host.
+The actual tool controls are server-rendered into each route, not hidden behind a client-readiness gate. Only processing libraries remain on-demand. If application JavaScript never starts, a small connection-help notice appears below the still-visible controls after 12 seconds. It offers a full-page reload instead of depending on a broken client router. JavaScript-disabled browsers receive an explicit explanation. This does not make tools run without JavaScript or repair missing files on a remote host.
 
 Deploy the **entire** fresh `out/` directory atomically, including `_next/`, `vendor/` and `workers/`. Do not publish only HTML, apply a catch-all HTML rewrite to JavaScript/WASM requests, or cache HTML indefinitely. The supplied `_headers` requests HTML revalidation and immutable caching only for versioned Next assets; confirm your host actually honors it.
 
@@ -169,3 +169,6 @@ npm run verify:deployment -- https://YOUR-ACTUAL-DOMAIN
 ```
 
 The read-only checker verifies sitemap routes, unique page titles, script/style files, processing asset MIME types, missing files and accidental HTML rewrites. `npm run verify:deployment -- --local` checks the static export locally and runs in CI. A successful local check does not establish that a separately hosted copy is complete or current.
+
+
+Image Resizer and Image Compressor also accept images pasted with Ctrl+V / Cmd+V when the browser exposes image clipboard data. This uses the same local decoder and batch processing path as file selection; it does not read clipboard contents in the background.

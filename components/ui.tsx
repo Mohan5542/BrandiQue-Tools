@@ -1,6 +1,7 @@
 "use client";
 import {
   useEffect,
+  useCallback,
   useId,
   useRef,
   useState,
@@ -58,11 +59,13 @@ export function UploadDropzone({
   accept,
   multiple = false,
   disabled = false,
+  pasteImages = false,
 }: {
   onFiles: (f: File[]) => void | Promise<void>;
   accept: string;
   multiple?: boolean;
   disabled?: boolean;
+  pasteImages?: boolean;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -73,26 +76,42 @@ export function UploadDropzone({
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   const blocked = disabled || !ready || reading;
-  async function receive(files: File[]) {
-    // React may replay a valid selection before the readiness effect commits.
-    // Readiness gates the picker UI, never discards an already selected file.
-    if (disabled || picking.current || !files.length) return;
-    picking.current = true;
-    setReading(true);
-    setError("");
-    try {
-      // MIME metadata is frequently absent in mobile/cloud file pickers.
-      // Actual image/PDF decoders still validate the untrusted contents.
-      await onFiles(
-        files.slice(0, multiple ? undefined : 1).map(normalizeFile),
+  const receive = useCallback(
+    async (files: File[]) => {
+      // React may replay a valid selection before the readiness effect commits.
+      // Readiness gates the picker UI, never discards an already selected file.
+      if (disabled || picking.current || !files.length) return;
+      picking.current = true;
+      setReading(true);
+      setError("");
+      try {
+        // MIME metadata is frequently absent in mobile/cloud file pickers.
+        // Actual image/PDF decoders still validate the untrusted contents.
+        await onFiles(
+          files.slice(0, multiple ? undefined : 1).map(normalizeFile),
+        );
+      } catch (e) {
+        setError(message(e));
+      } finally {
+        picking.current = false;
+        setReading(false);
+      }
+    },
+    [disabled, multiple, onFiles],
+  );
+  useEffect(() => {
+    if (!pasteImages || blocked) return;
+    const paste = (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData?.files || []).filter(
+        (file) => file.type.startsWith("image/"),
       );
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      picking.current = false;
-      setReading(false);
-    }
-  }
+      if (!files.length) return;
+      event.preventDefault();
+      void receive(files);
+    };
+    window.addEventListener("paste", paste);
+    return () => window.removeEventListener("paste", paste);
+  }, [pasteImages, blocked, receive]);
   return (
     <div
       className={`dropzone ${drag ? "drag" : ""}`}
@@ -135,6 +154,7 @@ export function UploadDropzone({
         }}
       />
       <small>{accept.replaceAll(",", " · ")}</small>
+      {pasteImages && <small>Or paste a copied image with Ctrl+V / ⌘V.</small>}
       {reading && (
         <span role="status">Reading your selection on this device…</span>
       )}

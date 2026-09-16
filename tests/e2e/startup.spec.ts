@@ -6,10 +6,17 @@ test("missing application scripts cannot leave an endless workspace message", as
   await page.route("**/_next/static/**/*.js*", (route) => route.abort());
   await page.goto("/tools/image-resizer/");
   await expect(
-    page.getByText("This tool could not start.", { exact: true }),
+    page.getByRole("button", { name: "Choose files", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".tool-controls")).toHaveAttribute("disabled", "");
+  await expect(
+    page.getByRole("button", { name: "Choose files", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText(/The controls have not connected yet/),
   ).toBeVisible({ timeout: 18000 });
   await expect(
-    page.getByRole("link", { name: "Reload tool", exact: true }),
+    page.getByRole("link", { name: "Reload this tool", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("Starting your tool…", { exact: true }),
@@ -24,7 +31,10 @@ test("JavaScript disabled shows an honest explanation and recovery without runni
   await page.goto("http://127.0.0.1:3000/tools/image-resizer/");
   await expect(page.getByText(/JavaScript is disabled/)).toBeVisible();
   await expect(
-    page.getByText("This tool could not start.", { exact: true }),
+    page.getByRole("button", { name: "Choose files", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/The controls have not connected yet/),
   ).toBeVisible({ timeout: 18000 });
   await context.close();
 });
@@ -60,4 +70,27 @@ test("tool navigation starts real controls and produces no hydration or chunk er
       .click();
   }
   expect(errors).toEqual([]);
+});
+
+test("all 39 tool pages include real controls before JavaScript executes", async ({
+  browser,
+}) => {
+  const { tools } = await import("../../lib/registry");
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  for (const tool of tools) {
+    await page.goto(`http://127.0.0.1:3000/tools/${tool.slug}/`);
+    await expect(page.locator(".tool-controls")).toBeVisible();
+    await expect(
+      page
+        .locator(
+          ".tool-controls input, .tool-controls textarea, .tool-controls select",
+        )
+        .first(),
+    ).toBeAttached();
+    await expect(
+      page.getByText(/Opening your workspace|Starting your tool/),
+    ).toHaveCount(0);
+  }
+  await context.close();
 });
