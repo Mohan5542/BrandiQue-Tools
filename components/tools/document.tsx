@@ -171,9 +171,23 @@ export default function DocumentTool({ slug }: { slug: string }) {
               </select>
             </Field>
           </div>
-          <button className="button" disabled={busy} onClick={run}>
-            Convert document
-          </button>
+          <div className="toolbar">
+            <button className="button" disabled={busy} onClick={run}>
+              {busy ? "Converting…" : "Convert document"}
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setFile(null);
+                setOutput(null);
+                setPreview("");
+                setError("");
+                setStatus("");
+              }}
+            >
+              Reset
+            </button>
+          </div>
         </>
       )}
       <ErrorAlert error={error} />

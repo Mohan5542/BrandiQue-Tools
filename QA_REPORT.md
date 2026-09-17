@@ -106,3 +106,20 @@ Build, lint, strict types, 20 unit tests and local deployment asset validation p
 Final cold-load interaction readiness under the documented slow-network lab conditions: Image Resizer 1.60 s, PDF Editor 1.56 s, Video Resizer 1.59 s, Resume Builder 1.56 s. Controls are visible before these interaction-ready times because they are in the HTML. Browser tooling still needs JavaScript, and video encoding is not instantaneous. Final route audit: 45 sitemap routes, 46 links checked, no broken links/page errors, no external homepage requests or heavy-engine requests.
 
 The user did not provide a live URL or running method when asked. The hosted failure therefore remains unverified; source changes and local tests cannot prove that a separately deployed copy is complete or current.
+
+## Vercel audit and reliability update — 2026-09-17
+
+On the supplied Vercel deployment, all 39 tool routes rendered their controls and reached `data-tool-ready=true` during the September 16 browser audit. Sample PDF text extraction and image resizing produced output. The cloud browser did not report a download event for the old programmatic download button; live download success was not established. Extension-origin console messages are not application errors. Video verification was interrupted by the workspace disconnect.
+
+Changes in this update:
+- Persistent native download links for generated blobs, with URL cleanup on replacement/unmount.
+- Image presets use the stated dimensions; either dimension can be edited with aspect lock. Settings are disabled during processing, and changing settings removes obsolete output.
+- Video preset controls are disabled during processing, smaller-file preset avoids upscaling, and outputs are cleared when settings change.
+- Correct “larger” versus “smaller” output-size reporting; document reset.
+- RGB/HSL and short HEX input, Unicode title-case handling, percentage change/ratio modes, tiny unit-value precision and overflow validation.
+- Resume import rejects duplicate section IDs; reset handles blocked browser storage.
+- Default canonical origin now matches the supplied Vercel production URL; NEXT_PUBLIC_SITE_URL remains configurable.
+
+After reconnection, lint, TypeScript and 22 unit tests passed. The interrupted Turbopack cache had a truncated block; moving the generated cache aside allowed a clean production build to pass. Browser regression results are recorded below after completion.
+
+Final local verification: **30/30 Playwright tests passed in 1.3 minutes**, including actual downloaded image/media/PDF/DOCX outputs, worker fallback and reuse, upload/paste paths, cancellation, 39 routes at the configured viewport widths, accessibility checks and the new regression cases. Deployment checker: 45 routes, 12 script/style assets and 4 processing assets, zero failures. This is Chromium/local-export verification, not a guarantee for every device or input file.

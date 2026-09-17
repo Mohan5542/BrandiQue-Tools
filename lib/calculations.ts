@@ -71,7 +71,10 @@ export function convert(value: number, kind: string, from: string, to: string) {
         ? (c * 9) / 5 + 32
         : c + 273.15;
   }
-  return (value * units[kind][from]) / units[kind][to];
+  const result = value * (units[kind][from] / units[kind][to]);
+  if (!Number.isFinite(result))
+    throw new Error("These values exceed the supported numeric range.");
+  return result;
 }
 export function emi(principal: number, annualRate: number, months: number) {
   if (
@@ -219,4 +222,97 @@ export function recordsToCsv(value: unknown) {
     headers.map(escape).join(","),
     ...value.map((v) => headers.map((h) => escape(v[h])).join(",")),
   ].join("\r\n");
+}
+
+/** Parses supported CSS color notation without injecting CSS or HTML. */
+export function parseColor(input: string) {
+  const value = input.trim().toLowerCase();
+  let channels: number[];
+  if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(value)) {
+    const hex =
+      value.length === 4
+        ? value
+            .slice(1)
+            .split("")
+            .map((c) => c + c)
+            .join("")
+        : value.slice(1);
+    channels = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  } else {
+    const match = value.match(
+      /^(rgb|hsl)\(\s*([+-]?(?:\d*\.)?\d+)\s*,\s*([+-]?(?:\d*\.)?\d+)(%?)\s*,\s*([+-]?(?:\d*\.)?\d+)(%?)\s*\)$/,
+    );
+    if (!match)
+      throw new Error(
+        "Use #RGB, #RRGGBB, rgb(255, 0, 0), or hsl(0, 100%, 50%).",
+      );
+    const a = Number(match[2]),
+      b = Number(match[3]),
+      c = Number(match[5]);
+    if (match[1] === "rgb") {
+      if (
+        match[4] ||
+        match[6] ||
+        [a, b, c].some((n) => !Number.isInteger(n) || n < 0 || n > 255)
+      )
+        throw new Error("RGB channels must be whole numbers from 0 to 255.");
+      channels = [a, b, c];
+    } else {
+      if (
+        match[4] !== "%" ||
+        match[6] !== "%" ||
+        b < 0 ||
+        b > 100 ||
+        c < 0 ||
+        c > 100
+      )
+        throw new Error(
+          "HSL saturation and lightness must be percentages from 0 to 100.",
+        );
+      const h = ((a % 360) + 360) % 360,
+        s = b / 100,
+        l = c / 100;
+      const chroma = (1 - Math.abs(2 * l - 1)) * s,
+        x = chroma * (1 - Math.abs(((h / 60) % 2) - 1)),
+        m = l - chroma / 2;
+      const base =
+        h < 60
+          ? [chroma, x, 0]
+          : h < 120
+            ? [x, chroma, 0]
+            : h < 180
+              ? [0, chroma, x]
+              : h < 240
+                ? [0, x, chroma]
+                : h < 300
+                  ? [x, 0, chroma]
+                  : [chroma, 0, x];
+      channels = base.map((n) => Math.round((n + m) * 255));
+    }
+  }
+  const [r, g, b] = channels.map((n) => n / 255),
+    max = Math.max(r, g, b),
+    min = Math.min(r, g, b),
+    delta = max - min,
+    l = (max + min) / 2;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+  let hue =
+    delta === 0
+      ? 0
+      : max === r
+        ? ((g - b) / delta) % 6
+        : max === g
+          ? (b - r) / delta + 2
+          : (r - g) / delta + 4;
+  hue = (hue * 60 + 360) % 360;
+  return {
+    hex:
+      "#" +
+      channels
+        .map((n) => n.toString(16).padStart(2, "0"))
+        .join("")
+        .toUpperCase(),
+    rgb: `rgb(${channels.join(", ")})`,
+    hsl: `hsl(${hue.toFixed(1)}, ${(saturation * 100).toFixed(1)}%, ${(l * 100).toFixed(1)}%)`,
+  };
 }

@@ -267,7 +267,7 @@ export const tools: Tool[] = [
     [
       "color-converter",
       "Color Converter",
-      "Convert a six-digit HEX color into RGB and HSL values with a live swatch.",
+      "Convert HEX, RGB and HSL color notation into matching values for design and development.",
     ],
     [
       "timestamp-converter",
@@ -451,5 +451,5 @@ export function related(t: Tool) {
   ).slice(0, 4);
 }
 export const siteUrl = (
-  process.env.NEXT_PUBLIC_SITE_URL || "https://tools.brandique.in"
+  process.env.NEXT_PUBLIC_SITE_URL || "https://brandique-tools.vercel.app"
 ).replace(/\/$/, "");

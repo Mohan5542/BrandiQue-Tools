@@ -4,7 +4,7 @@ import { calendarAge, convert, emi, units } from "@/lib/calculations";
 import { Field, ErrorAlert } from "@/components/ui";
 import { message } from "@/lib/files";
 const fmt = (n: number) =>
-  new Intl.NumberFormat(undefined, { maximumFractionDigits: 8 }).format(n);
+  new Intl.NumberFormat(undefined, { maximumSignificantDigits: 12 }).format(n);
 export function UnitTool({ slug }: { slug: string }) {
   const initial = slug.replace("-converter", "");
   const [kind, setKind] = useState(initial === "unit" ? "length" : initial);
@@ -91,7 +91,8 @@ export function CalculatorTool({ slug }: { slug: string }) {
   const [a, setA] = useState("1000"),
     [b, setB] = useState("10"),
     [c, setC] = useState("12"),
-    [mode, setMode] = useState("add");
+    [mode, setMode] = useState("add"),
+    [percentageMode, setPercentageMode] = useState("of");
   let results: [string, number][] = [];
   let error = "";
   try {
@@ -120,6 +121,16 @@ export function CalculatorTool({ slug }: { slug: string }) {
         ["Sale price", x * (1 - y / 100)],
         ["You save", (x * y) / 100],
       ];
+    } else if (percentageMode === "change") {
+      if (x === 0)
+        throw new Error("Percentage change needs a non-zero original value.");
+      results = [
+        ["Percentage change (%)", ((y - x) / x) * 100],
+        ["Difference", y - x],
+      ];
+    } else if (percentageMode === "ratio") {
+      if (y === 0) throw new Error("The total must be greater than zero.");
+      results = [["Percentage (%)", (x / y) * 100]];
     } else {
       results = [
         ["Percentage of amount", (x * y) / 100],
@@ -135,7 +146,29 @@ export function CalculatorTool({ slug }: { slug: string }) {
   return (
     <>
       <div className="fields">
-        <Field label={slug === "emi-calculator" ? "Loan amount" : "Amount"}>
+        {slug === "percentage-calculator" && (
+          <Field label="Calculation mode">
+            <select
+              value={percentageMode}
+              onChange={(e) => setPercentageMode(e.target.value)}
+            >
+              <option value="of">Percentage of an amount</option>
+              <option value="change">Percentage change between values</option>
+              <option value="ratio">
+                One value as a percentage of another
+              </option>
+            </select>
+          </Field>
+        )}
+        <Field
+          label={
+            slug === "emi-calculator"
+              ? "Loan amount"
+              : slug === "percentage-calculator" && percentageMode === "change"
+                ? "Original value"
+                : "Amount"
+          }
+        >
           <input
             type="number"
             min="0"
@@ -147,7 +180,11 @@ export function CalculatorTool({ slug }: { slug: string }) {
           label={
             slug === "emi-calculator"
               ? "Annual interest rate (%)"
-              : "Percentage (%)"
+              : slug === "percentage-calculator" && percentageMode !== "of"
+                ? percentageMode === "change"
+                  ? "New value"
+                  : "Total value"
+                : "Percentage (%)"
           }
         >
           <input

@@ -25,7 +25,7 @@ test("file picker is keyboard accessible and accepts files without MIME metadata
   await page
     .getByRole("button", { name: "Resize images", exact: true })
     .click();
-  await expect(page.getByRole("button", { name: /Download ·/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Download ·/ })).toBeVisible();
 });
 
 test("valid image survives mixed batch and same file can be picked again", async ({
@@ -90,7 +90,7 @@ test("image worker failure falls back to a real decodable download", async ({
   await page
     .getByRole("button", { name: "Resize images", exact: true })
     .click();
-  const button = page.getByRole("button", { name: /Download ·/ });
+  const button = page.getByRole("link", { name: /Download ·/ });
   await expect(button).toBeVisible();
   const pending = page.waitForEvent("download");
   await button.click();
@@ -143,7 +143,7 @@ test("video worker is reused on repeat conversion and released on navigation", a
     await page
       .getByRole("button", { name: "Convert video", exact: true })
       .click();
-    await expect(page.getByRole("button", { name: /Download ·/ })).toBeVisible({
+    await expect(page.getByRole("link", { name: /Download ·/ })).toBeVisible({
       timeout: 90000,
     });
     await expect(
@@ -154,7 +154,7 @@ test("video worker is reused on repeat conversion and released on navigation", a
   await page.locator('.tool-card[href="/tools/video-to-audio/"]').click();
   await expect(page.locator("h1")).toHaveText("Video to Audio");
   await expect.poll(() => page.workers().length).toBe(0);
-  await expect(page.getByRole("button", { name: /Download ·/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Download ·/ })).toHaveCount(0);
 });
 
 test("real file picker works across all shared file workspaces", async ({
@@ -209,5 +209,5 @@ test("image resizer accepts pasted image bytes and exports a real file", async (
   await page
     .getByRole("button", { name: "Resize images", exact: true })
     .click();
-  await expect(page.getByRole("button", { name: /Download ·/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Download ·/ })).toBeVisible();
 });

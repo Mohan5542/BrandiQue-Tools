@@ -147,3 +147,29 @@ describe("File metadata compatibility", () => {
     expect(normalizeFile(original)).toBe(original);
   });
 });
+
+describe("Color notation and numeric precision", () => {
+  it("converts short HEX, RGB and wrapped HSL hues consistently", async () => {
+    const { parseColor } = await import("../lib/calculations");
+    expect(parseColor("#f00").hex).toBe("#FF0000");
+    expect(parseColor("rgb(251, 255, 0)").hex).toBe("#FBFF00");
+    expect(parseColor("hsl(-120, 100%, 50%)").hex).toBe("#0000FF");
+    expect(parseColor("hsl(720, 0%, 50%)").hex).toBe("#808080");
+    for (const bad of [
+      "rgb(256, 0, 0)",
+      "rgb(1%, 2%, 3%)",
+      "hsl(0, 110%, 50%)",
+      "red; background: url(x)",
+    ]) {
+      expect(() => parseColor(bad)).toThrow();
+    }
+  });
+  it("preserves very small conversions and rejects overflow", () => {
+    expect(convert(1, "area", "Square millimeter", "Square kilometer")).toBe(
+      1e-12,
+    );
+    expect(() =>
+      convert(Number.MAX_VALUE, "length", "Kilometer", "Millimeter"),
+    ).toThrow();
+  });
+});

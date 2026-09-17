@@ -276,7 +276,14 @@ export default function VideoTool({ slug }: { slug: string }) {
             </div>
           </div>
           <BlobPreview blob={file} type="video" />
-          <fieldset className="fields" disabled={busy || metadataBusy}>
+          <fieldset
+            className="fields"
+            disabled={busy || metadataBusy}
+            onChange={() => {
+              setOutput(null);
+              setProgress(undefined);
+            }}
+          >
             <Field label="Output format">
               <select
                 value={format}
@@ -311,9 +318,11 @@ export default function VideoTool({ slug }: { slug: string }) {
                 <Field label="Height (px)">
                   <input
                     type="number"
-                    disabled={lock}
                     value={h}
-                    onChange={(e) => setH(+e.target.value)}
+                    onChange={(e) => {
+                      setH(+e.target.value);
+                      if (lock) setW(Math.round(+e.target.value * ratio));
+                    }}
                   />
                 </Field>
                 <Field label="Resolution preset">
@@ -396,7 +405,14 @@ export default function VideoTool({ slug }: { slug: string }) {
             </Field>
           </fieldset>
           {!audioOnly && (
-            <div className="toolbar">
+            <fieldset
+              className="toolbar"
+              disabled={busy || metadataBusy}
+              onChange={() => {
+                setOutput(null);
+                setProgress(undefined);
+              }}
+            >
               <label className="check">
                 <input
                   type="checkbox"
@@ -415,9 +431,13 @@ export default function VideoTool({ slug }: { slug: string }) {
               </label>
               <button
                 onClick={() => {
+                  setOutput(null);
+                  setProgress(undefined);
                   setQuality(32);
-                  setW(854);
-                  setH(Math.round(854 / ratio));
+                  const width = Math.min(original.w, 854);
+                  setW(width);
+                  setH(Math.round(width / ratio));
+                  setScale(Math.round((width / original.w) * 100));
                   setFps(24);
                   setAudioBitrate(96);
                   setBitrate(0);
@@ -427,6 +447,9 @@ export default function VideoTool({ slug }: { slug: string }) {
               </button>
               <button
                 onClick={() => {
+                  setOutput(null);
+                  setProgress(undefined);
+                  setScale(100);
                   setQuality(23);
                   setW(original.w);
                   setH(original.h);
@@ -437,7 +460,7 @@ export default function VideoTool({ slug }: { slug: string }) {
               >
                 Higher quality preset
               </button>
-            </div>
+            </fieldset>
           )}
           {bitrate > 0 && duration > 0 && (
             <p className="muted">
@@ -484,7 +507,8 @@ export default function VideoTool({ slug }: { slug: string }) {
           <BlobPreview blob={output} type={audioOnly ? "audio" : "video"} />
           <p>
             {bytes(file.size)} → {bytes(output.size)} (
-            {((1 - output.size / file.size) * 100).toFixed(1)}% smaller)
+            {Math.abs((1 - output.size / file.size) * 100).toFixed(1)}%{" "}
+            {output.size <= file.size ? "smaller" : "larger"})
           </p>
           <DownloadButton blob={output} name={"brandique-output." + format} />
         </div>

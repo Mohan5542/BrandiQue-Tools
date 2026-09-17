@@ -172,3 +172,11 @@ The read-only checker verifies sitemap routes, unique page titles, script/style 
 
 
 Image Resizer and Image Compressor also accept images pasted with Ctrl+V / Cmd+V when the browser exposes image clipboard data. This uses the same local decoder and batch processing path as file selection; it does not read clipboard contents in the background.
+
+### Vercel production URL and recent improvements
+
+The default canonical origin is `https://brandique-tools.vercel.app`. Set `NEXT_PUBLIC_SITE_URL` before building if you move to a custom domain. Vercel should build with `npm run build` and serve the generated static export; do not use `npm run dev` for production.
+
+Generated-file download controls use native download links. Image presets define exact output boxes (unlocking aspect ratio); manual width or height changes can preserve the source ratio. Changing image/video settings clears the previous output so it cannot be confused with a new conversion. File-size comparisons explicitly distinguish larger outputs.
+
+Color Converter accepts short/full HEX, integer RGB and comma-separated HSL. Percentage Calculator includes percentage-of, percentage-change and ratio modes. Document conversion includes Reset. These updates do not add remote file processing or new dependencies.

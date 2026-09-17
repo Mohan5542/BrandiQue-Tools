@@ -90,7 +90,7 @@ test("image resize and compressor export decodable files without uploading", asy
       .click();
     await expect(page.getByRole("status")).toContainText("complete");
     const event = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Download ·/ }).click();
+    await page.getByRole("link", { name: /Download ·/ }).click();
     const d = await event;
     const buf = await readFile((await d.path())!);
     expect(buf.length).toBeGreaterThan(20);
@@ -122,7 +122,7 @@ test("video resizer, compressor and audio extraction produce real media", async 
       { timeout: 90000 },
     );
     const event = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Download ·/ }).click();
+    await page.getByRole("link", { name: /Download ·/ }).click();
     const d = await event;
     await d.saveAs(
       "test-results/" + slug + (slug === "video-to-audio" ? ".mp3" : ".mp4"),
@@ -160,11 +160,9 @@ test("PDF merge, split, editor and compressor export valid page counts", async (
       ).toBeVisible();
     }
     await page.getByRole("button", { name: "Export PDF", exact: true }).click();
-    await expect(
-      page.getByRole("button", { name: /Download ·/ }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /Download ·/ })).toBeVisible();
     const event = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Download ·/ }).click();
+    await page.getByRole("link", { name: /Download ·/ }).click();
     const d = await event;
     const pdf = await PDFDocument.load(await readFile((await d.path())!));
     expect(pdf.getPageCount()).toBe(slug === "pdf-editor" ? 3 : 2);
@@ -175,9 +173,9 @@ test("PDF to Word exports actual editable text", async ({ page }) => {
   await expect(page.locator("[data-tool-ready=true]")).toBeVisible();
   await page.locator("input[type=file]").setInputFiles(fixture("pdf"));
   await page.getByRole("button", { name: "Convert document" }).click();
-  await expect(page.getByRole("button", { name: /Download ·/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Download ·/ })).toBeVisible();
   const event = page.waitForEvent("download");
-  await page.getByRole("button", { name: /Download ·/ }).click();
+  await page.getByRole("link", { name: /Download ·/ }).click();
   const d = await event;
   const zip = await JSZip.loadAsync(await readFile((await d.path())!));
   expect(await zip.file("word/document.xml")!.async("string")).toContain(
@@ -224,13 +222,13 @@ test("screenshot and image to PDF export valid outputs", async ({ page }) => {
   await expect(page.locator("[data-tool-ready=true]")).toBeVisible();
   await page.locator("input[type=file]").setInputFiles(fixture("png"));
   await page.getByRole("button", { name: "Export screenshot" }).click();
-  await expect(page.getByRole("button", { name: /Download ·/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Download ·/ })).toBeVisible();
   await page.goto("/tools/image-to-pdf/");
   await expect(page.locator("[data-tool-ready=true]")).toBeVisible();
   await page.locator("input[type=file]").setInputFiles(fixture("png"));
   await page.getByRole("button", { name: "Create PDF" }).click();
   const event = page.waitForEvent("download");
-  await page.getByRole("button", { name: /Download ·/ }).click();
+  await page.getByRole("link", { name: /Download ·/ }).click();
   const d = await event;
   expect(
     (await PDFDocument.load(await readFile((await d.path())!))).getPageCount(),
@@ -300,7 +298,7 @@ test("secondary utilities return correct values and real QR and ZIP output", asy
   await page.getByLabel("Your input").fill("https://www.brandique.in");
   await page.getByRole("button", { name: "Generate", exact: true }).click();
   const qr = page.waitForEvent("download");
-  await page.getByRole("button", { name: /Download ·/ }).click();
+  await page.getByRole("link", { name: /Download ·/ }).click();
   expect(
     (await readFile((await (await qr).path())!)).subarray(1, 4).toString(),
   ).toBe("PNG");
@@ -348,7 +346,7 @@ test("document converter supports CSV and plain-text paths", async ({
   await page.getByLabel("Output format", { exact: true }).selectOption("docx");
   await page.getByRole("button", { name: "Convert document" }).click();
   const event = page.waitForEvent("download");
-  await page.getByRole("button", { name: /Download ·/ }).click();
+  await page.getByRole("link", { name: /Download ·/ }).click();
   expect(
     await (
       await JSZip.loadAsync(await readFile((await (await event).path())!))
@@ -392,7 +390,7 @@ test("interactive workspaces meet critical accessibility checks and reject inval
     buffer: Buffer.from("not an image"),
   });
   await expect(page.locator(".app-card [role=alert]")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Download ·/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Download ·/ })).toHaveCount(0);
   await page.goto("/tools/pdf-editor/");
   await expect(page.locator("[data-tool-ready=true]")).toBeVisible();
   await page
@@ -430,7 +428,7 @@ test("video format alternatives and cancellation are real", async ({
       .click();
     await expect(page.getByRole("status")).toContainText("Conversion complete");
     const event = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Download ·/ }).click();
+    await page.getByRole("link", { name: /Download ·/ }).click();
     const d = await event;
     await d.saveAs("test-results/alternative." + format);
     const b = await readFile((await d.path())!);
@@ -451,7 +449,7 @@ test("video format alternatives and cancellation are real", async ({
     .getByRole("button", { name: "Cancel processing", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("Cancelled");
-  await expect(page.getByRole("button", { name: /Download ·/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Download ·/ })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Convert video", exact: true }),
   ).toBeEnabled();
@@ -470,7 +468,7 @@ test("PDF annotation and screenshot cropping change exported content", async ({
   await page.locator("canvas").click({ position: { x: 70, y: 100 } });
   await page.getByRole("button", { name: "Export PDF", exact: true }).click();
   const event = page.waitForEvent("download");
-  await page.getByRole("button", { name: /Download ·/ }).click();
+  await page.getByRole("link", { name: /Download ·/ }).click();
   const pdf = await PDFDocument.load(
     await readFile((await (await event).path())!),
   );

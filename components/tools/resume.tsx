@@ -34,6 +34,7 @@ function valid(data: unknown): data is Resume {
     ["classic", "serif", "compact"].includes(d.template) &&
     Array.isArray(d.sections) &&
     d.sections.length <= 30 &&
+    new Set(d.sections.map((s) => s?.id)).size === d.sections.length &&
     d.sections.every(
       (s) =>
         s &&
@@ -158,7 +159,13 @@ export default function ResumeTool() {
               )
             ) {
               setResume(structuredClone(empty));
-              localStorage.removeItem("brandique-resume");
+              try {
+                localStorage.removeItem("brandique-resume");
+              } catch {
+                setError(
+                  "Resume cleared from this page. Browser storage is unavailable; saved data could not be removed.",
+                );
+              }
             }
           }}
         >

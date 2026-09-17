@@ -252,7 +252,16 @@ export default function ImageTool({ slug }: { slug: string }) {
       />
       {files.length > 0 && (
         <>
-          <div className="fields">
+          <fieldset
+            className="fields"
+            disabled={busy}
+            onChange={() => {
+              setFiles((prev) =>
+                prev.map((entry) => ({ ...entry, output: undefined })),
+              );
+              setStatus("");
+            }}
+          >
             <Field label="Resize mode">
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
                 <option value="dimensions">Exact dimensions</option>
@@ -290,9 +299,15 @@ export default function ImageTool({ slug }: { slug: string }) {
                   <input
                     type="number"
                     min="1"
-                    disabled={lock}
                     value={h}
-                    onChange={(e) => setH(+e.target.value)}
+                    onChange={(e) => {
+                      const n = +e.target.value;
+                      setH(n);
+                      if (lock)
+                        setW(
+                          Math.round((n * files[0].width) / files[0].height),
+                        );
+                    }}
                   />
                 </Field>
               </>
@@ -304,11 +319,8 @@ export default function ImageTool({ slug }: { slug: string }) {
                   if (e.target.value) {
                     const [x, y] = e.target.value.split("x").map(Number);
                     setW(x);
-                    setH(
-                      lock
-                        ? Math.round((x * files[0].height) / files[0].width)
-                        : y,
-                    );
+                    setH(y);
+                    setLock(false);
                     setMode("dimensions");
                   }
                 }}
@@ -356,12 +368,21 @@ export default function ImageTool({ slug }: { slug: string }) {
                 />
               </Field>
             )}
-          </div>
+          </fieldset>
           <label className="check">
             <input
               type="checkbox"
               checked={lock}
-              onChange={(e) => setLock(e.target.checked)}
+              disabled={busy}
+              onChange={(e) => {
+                setLock(e.target.checked);
+                if (e.target.checked)
+                  setH(Math.round((w * files[0].height) / files[0].width));
+                setFiles((prev) =>
+                  prev.map((entry) => ({ ...entry, output: undefined })),
+                );
+                setStatus("");
+              }}
             />
             Lock each image’s aspect ratio (width takes priority)
           </label>
@@ -448,8 +469,8 @@ export default function ImageTool({ slug }: { slug: string }) {
                 <BlobPreview blob={f.output} />
                 <p className="muted">
                   {f.ow} × {f.oh} · {bytes(f.output.size)} ·{" "}
-                  {((1 - f.output.size / f.file.size) * 100).toFixed(1)}%
-                  smaller
+                  {Math.abs((1 - f.output.size / f.file.size) * 100).toFixed(1)}
+                  %{f.output.size <= f.file.size ? " smaller" : " larger"}
                 </p>
                 {target > 0 && f.output.size > target * 1024 && (
                   <p className="notice">

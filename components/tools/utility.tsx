@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Field, ErrorAlert, DownloadButton } from "@/components/ui";
+import { parseColor } from "@/lib/calculations";
 import { download, message } from "@/lib/files";
 export default function Utility({ slug }: { slug: string }) {
   const [input, setInput] = useState(
@@ -16,6 +17,7 @@ export default function Utility({ slug }: { slug: string }) {
   async function run(action: string) {
     setError("");
     setOutput("");
+    setQr(null);
     try {
       if (slug === "json-formatter" || slug === "json-validator") {
         const parsed = JSON.parse(input);
@@ -53,7 +55,10 @@ export default function Utility({ slug }: { slug: string }) {
               : action === "Title Case"
                 ? input
                     .toLowerCase()
-                    .replace(/\b\p{L}/gu, (c) => c.toUpperCase())
+                    .replace(
+                      /(^|[^\p{L}\p{M}\p{N}])(\p{L})/gu,
+                      (_, prefix, letter) => prefix + letter.toUpperCase(),
+                    )
                 : input
                     .toLowerCase()
                     .replace(/(^\s*\p{L}|[.!?]\s+\p{L})/gu, (c) =>
@@ -84,27 +89,8 @@ export default function Utility({ slug }: { slug: string }) {
         }
         setOutput(result);
       } else if (slug === "color-converter") {
-        if (!/^#[0-9a-f]{6}$/i.test(input))
-          throw new Error("Enter a six-digit HEX color, for example #FBFF00.");
-        const rgb = [1, 3, 5].map((i) => parseInt(input.slice(i, i + 2), 16)),
-          [r, g, b] = rgb.map((n) => n / 255),
-          max = Math.max(r, g, b),
-          min = Math.min(r, g, b),
-          d = max - min,
-          l = (max + min) / 2,
-          s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
-        let h =
-          d === 0
-            ? 0
-            : max === r
-              ? ((g - b) / d) % 6
-              : max === g
-                ? (b - r) / d + 2
-                : (r - g) / d + 4;
-        h = (h * 60 + 360) % 360;
-        setOutput(
-          `${input.toUpperCase()}\nrgb(${rgb.join(", ")})\nhsl(${h.toFixed(1)}, ${(s * 100).toFixed(1)}%, ${(l * 100).toFixed(1)}%)`,
-        );
+        const color = parseColor(input);
+        setOutput(`${color.hex}\n${color.rgb}\n${color.hsl}`);
       } else if (slug === "timestamp-converter") {
         if (!input.trim()) throw new Error("Enter a timestamp or date.");
         const date =
@@ -175,7 +161,7 @@ export default function Utility({ slug }: { slug: string }) {
         <Field
           label={
             slug === "color-converter"
-              ? "HEX color"
+              ? "Color (HEX, RGB or HSL)"
               : slug === "timestamp-converter"
                 ? "Unix timestamp or ISO date (include timezone)"
                 : "Your input"

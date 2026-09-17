@@ -10,7 +10,7 @@ import {
   type ReactElement,
 } from "react";
 import { UploadCloud, ShieldCheck, Download, AlertCircle } from "lucide-react";
-import { bytes, download, normalizeFile, message } from "@/lib/files";
+import { bytes, safeName, normalizeFile, message } from "@/lib/files";
 export function Field({
   label,
   children,
@@ -196,12 +196,18 @@ export function BlobPreview({
   );
 }
 export function DownloadButton({ blob, name }: { blob: Blob; name: string }) {
-  return (
-    <button className="button" onClick={() => download(blob, name)}>
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(blob);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [blob]);
+  return url ? (
+    <a className="button" href={url} download={safeName(name)}>
       <Download size={17} />
       Download · {bytes(blob.size)}
-    </button>
-  );
+    </a>
+  ) : null;
 }
 export function Status({
   text,
